@@ -38,34 +38,47 @@ views.Filters = Backbone.View.extend({
                     var donorCountry = _(app.app.filters).where({ collection: 'donor_countries' });
                     donorCountry = (donorCountry.length) ? donorCountry[0].id : false;
                 }
-    
+
                 setTimeout(function() {
                     filterModels = view.collection.chain().filter(function(model) {
-                    
-                            // Filter donors on active donor country
-                            var donorCountryFilter = (donorCountry) ? (model.get('country') === donorCountry) : true;
+                        // Filter donors on active donor country
+                        var donorCountryFilter = (donorCountry) ? (model.get('country') === donorCountry) : true;
 
-                            return (model.get('visible') && model.get('count') > 0 && donorCountryFilter);
+                        return (model.get('visible') && model.get('count') > 0 && donorCountryFilter);
 
-                        }).value();
+                    }).value();
                     filterCallback();
-
                 }, 0);
-                
+
                 if (donorCountry) {
                     chartModels = view.collection.chain()
                         .filter(function(model) {
                             return (model.get('country') === donorCountry);
                         }).value();
-                } else {
+                } else if (view.collection.id == 'donors'){
+                    // Creating chartModels array for top budget sources, filter through 
+                    // more countries since the budget sources are calculated below, 
+                    // resulting in a different number than budget
                     chartModels = view.collection.chain()
                         .sortBy(function(model) {
-                            return -1 * model.get(chartType) || 0;
+                            return -1 * model.get('expenditure') || 0;
                         })
                         .filter(function(model) {
-                            return (model.get(chartType) > 0);
+                            return (model.get('expenditure') > 0);
                         })
-                        .first(20).value(); // Top 20
+                        .first(75)
+                        .value(); // Top 20
+                } else {
+                    // Top 20 donors, donor_countries, and operating_unit
+                    chartModels = view.collection.chain()
+                        .sortBy(function(model) {
+                            return -1 * model.get('expenditure') || 0;
+                        })
+                        .filter(function(model) {
+                            return (model.get('expenditure') > 0);
+                        })
+                        .first(20)
+                        .value(); // Top 20
                 }
                 if (view.collection.id === 'operating_unit') {
                     $('#applied-filters').addClass('no-country');
@@ -79,8 +92,9 @@ views.Filters = Backbone.View.extend({
 
                 if (filterModels.length) {
                     view.$el.html(templates.filters(view));
-                        app.description = app.description || [];
-                        app.donorDescription = app.donorDescription || [];
+                    app.description = app.description || [];
+                    app.donorDescription = app.donorDescription || [];
+                    app.donorTitle;
         
                     _(filterModels).each(function(model) {
         
@@ -104,25 +118,26 @@ views.Filters = Backbone.View.extend({
                                 app.description.push(' in the <strong>' + model.get('name').toLowerCase().toTitleCase() + '</strong> region');
                             }
                             if (view.collection.id === 'donor_countries') {
-                                var mId = model.id;
-        
-                                if (mId === 'MULTI_AGY') {
+                                if (donorCountry === 'MULTI_AGY') {
+                                    app.donorTitle = '<strong>Multi-Lateral Agencies</strong>';
                                     app.donorDescription = '<strong>Multi-Lateral Agencies</strong> fund <strong>' + app.projects.length +'</strong> ';
-                                } else if (mId === 'OTH') {
+                                } else if (donorCountry === 'OTH') {
+                                    app.donorTitle = '<strong>Uncategorized Organizations</strong>';
                                     app.donorDescription = '<strong>Uncategorized Organizations</strong> fund <strong>' + app.projects.length +'</strong> ';
                                 } else {
+                                    app.donorTitle = '<strong>' + model.get('name').toLowerCase().toTitleCase() + '</strong>';
                                     app.donorDescription = '<strong>' + model.get('name').toLowerCase().toTitleCase() + '</strong> funds <strong>' + app.projects.length +'</strong> ';
                                 }
                             }
                             if (view.collection.id === 'donors') {
                                 app.description.push(' through <strong>' + model.get('name').toLowerCase().toTitleCase() + '</strong>');
+
                             }
                             if (view.collection.id === 'focus_area') {
                                 app.description.push(' with a focus on <strong>' + model.get('name').toLowerCase().toTitleCase() + '</strong>');
                             }
                         }
                     });
-        
                 } else {
                     view.$el.empty();
                 }
@@ -181,20 +196,20 @@ views.Filters = Backbone.View.extend({
                             '<li class="focus fa' + model.id + '">' +
                             '  <span class="pct ' + focusIconClass + '"></span><a href="'+ pathTo + view.collection.id + '-' + model.id + '" class="focus-title">' + focusName + '</a>' +
                             '</li>');
-    
+
                         $('.fa' + (model.id) + ' .pct').text(value + '%');
                     });
-    
+
                     $el.prepend('<h3 id="focus">Focus Areas <span>% of budget</span></h3>');
                 } else if (view.collection.id === 'operating_unit' || view.collection.id === 'donors' || view.collection.id === 'donor_countries') {
-    
+
                     donor = (_(app.app.filters).find(function(filter) {
                             return filter.collection === 'donors';
                         }) || {id: 0}).id;
                     donor_ctry = (_(app.app.filters).find(function(filter) {
                             return filter.collection === 'donor_countries';
                         }) || {id: 0}).id;
-    
+
                     var max = '',
                         rows = [],
                         newWidth = 1;
